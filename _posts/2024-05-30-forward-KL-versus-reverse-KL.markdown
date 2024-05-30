@@ -2,7 +2,7 @@
 layout: post
 title:  "KL Divergence: Forward vs Reverse?"
 date:   2024-05-30 12:00:00 +0800
-categories: jekyll update
+categories: technical_tips
 ---
 
 **Kullback-Leibler Divergence**, or KL Divergence is a measure on how “off” two probability distributions $P(X)$ and $Q(X)$ are. It measures the distance between two probability distributions.
