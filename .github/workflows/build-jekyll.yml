@@ -26,4 +26,4 @@ jobs:
       - uses: jeffreytse/jekyll-deploy-action@v0.6.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          repository: 'ishikura-a.github.io'
+          repository: 'ishikura-a/ishikura-a.github.io'
