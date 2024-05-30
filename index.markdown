@@ -15,7 +15,7 @@ Currently, I have paid more attention to **Large-small-model Collaboration** and
 ## Publications
 
 **`[Arxiv]`** <span style="background:yellow;color:black">ModelGPT: Unleashing LLM's Capabilities for Tailored Model Generation</span>  
--- **Zihao Tang**, Zheqi Lv, Shengyu Zhang\*, Fei Wu, Kun Kuang\*.  
+-- **Zihao Tang**, Zheqi Lv, Shengyu Zhang, Fei Wu, Kun Kuang.  
 -- [**Paper**](https://arxiv.org/abs/2402.12408) \| [**Code**](https://github.com/IshiKura-a/ModelGPT)
 > <span style="color:red;font-weight:bold;">Main Idea:</span>  
 > User Requirement (data / description)  ---[<span style="color:red;font-weight:bold;">ModelGPT's inference</span>]--->  Off-the-Shelf Model!

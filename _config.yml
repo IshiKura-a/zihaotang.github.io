@@ -23,7 +23,8 @@ email: tangzihao@zju.edu.cn
 description: >- # this means to ignore newlines until "baseurl:"
   There should be something, but I just haven't figured it out :).
 baseurl: # the subpath of your site, e.g. /blog
-url: ishikura-a.github.io # the base hostname & protocol for your site, e.g. http://example.com
+url: https://ishikura-a.github.io # the base hostname & protocol for your site, e.g. http://example.com
+domain: ishikura-a.github.io
 twitter_username:
 github_username:  Ishikura-a
 
@@ -32,6 +33,7 @@ theme: minima
 plugins:
   - jekyll-feed
   - jekyll-spaceship
+  - github-pages
 
 # Exclude from processing.
 # The following items will not be processed, by default.
