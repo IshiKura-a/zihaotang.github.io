@@ -4,7 +4,7 @@
 
 layout: home
 ---
-Hi there, my name is **Zihao Tang**. Welcome to my website $X=Y$!
+Hi there, my name is **Zihao Tang**. Welcome to my website!
 
 I am currently a student in [Zhejiang University](https://www.zju.edu.cn), working on my Master Degree advised by A.P. [Kun Kuang](https://kunkuang.github.io) and Prof. [Fei Wu](https://person.zju.edu.cn/wufei). I am also engaged in an internship at [MSRA](https://www.msra.cn/).
 

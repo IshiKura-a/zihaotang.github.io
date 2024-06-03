@@ -1,0 +1,50 @@
+---
+layout: post
+title:  "SimPO: Simple Preference Optimization with a Reference-Free Reward"
+date:   2024-06-02 12:00:00 +0800
+categories: paper_reading
+---
+
+For background about DPO, readers are kindly referred to [TDPO](https://ishikura.github.io/paper_reading/2024/06/02/TDPO.html).
+
+Drawbacks of DPO:
+1. need a reference model
+2. increase response length
+
+In response, this work propose SimPO, a simple yet effective offline preference optimization algorithm.
+The core of the algorithm aligns the reward function in the preference optimization objective
+with the generation metric. SimPO consists of two major components:
+1. **a length-normalized reward**, calculated as the average log probability of all tokens in a response using the policy model.
+2. **a target reward margin** to ensure the reward difference between winning and losing responses exceeds this margin.
+
+Adopting the reward function defined in DPO as the following drawbacks:
+1. the requirement of a reference model $\pi_{\rm ref}$ during training incurs additional memory and computational costs.
+2. there is a discrepancy between the reward being optimized during training and the generation metric used for inference
+
+During generation, the policy model $\pi_\theta$ is used to generate a sequence that approximately maximizes the average log likelihood, defined as follows:
+
+$$
+p_\theta(y|x)=\frac{1}{\|y\|}\log\pi_\theta(y|x)=\frac{1}{\|y\|}\sum_{i=1}^{\|y\|}\log\pi_\theta(y_i\|x,y_{<i}).
+$$
+
+While direct maximization of this metric during decoding is intractable, in DPO, for any triple $(x,y_w,y_l)$, satisfying the reward ranking $r(x,y_w) > r(x,y_l)$ does not necessarily mean that the likelihood ranking $p_\theta(y_w\|x) > p_\theta(y_l\|x)$ is met.
+It is natural to replace the reward function in DPO with $p_\theta$ since it aligns with the likelihood metric that guides generation, resulting in a length-normalized reward:
+
+$$
+r_{\rm SimPO}(x,y)=\beta\cdot p_\theta(y|x),
+$$
+where $\beta$ is a constant that controls the scaling of the reward difference.
+
+Additionally, they introduce a target reward margin term $\gamma>0$, to the Bradley-Terry objective to ensure that the reward for the winning response $r(x,y_w)$, exceeds the reward for the losing response $r(x,y_l)$ by at least $\gamma$:
+
+$$
+p(y_w\succ y_l\|x)=\sigma(r(x,y_w)-r(x,y_l)-\gamma).
+$$
+
+Hence, we can derive the objective function of SimPO by NLL loss:
+$$
+L_{\rm SimPO}(\pi\_\theta)=-\mathbb{E}_{(x,y_w,y_l)\sim\mathcal{D}}[\log\sigma(p(y_w\succ y_l\|x))].
+$$
+
+The comparison of objective functions between SimPO and other baselines is put in the table below:
+![comp](/assets/240602001.png)
