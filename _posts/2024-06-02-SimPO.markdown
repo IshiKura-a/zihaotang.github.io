@@ -5,7 +5,7 @@ date:   2024-06-02 12:00:00 +0800
 categories: paper_reading
 ---
 
-For background about DPO, readers are kindly referred to [TDPO](https://ishikura.github.io/paper_reading/2024/06/02/TDPO.html).
+For background about DPO, readers are kindly referred to [TDPO](https://ishikura-a.github.io/paper_reading/2024/06/02/TDPO.html).
 
 Drawbacks of DPO:
 1. need a reference model
