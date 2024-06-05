@@ -9,7 +9,7 @@ For background about DPO, readers are kindly referred to [TDPO](https://ishikura
 
 Drawbacks of DPO:
 1. need a reference model
-2. increase response length
+2. the reward formulation is not directly aligned with the metric used to guide generation
 
 In response, this work propose SimPO, a simple yet effective offline preference optimization algorithm.
 The core of the algorithm aligns the reward function in the preference optimization objective
