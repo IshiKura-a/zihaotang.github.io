@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" ><generator uri="https://jekyllrb.com/" version="3.9.5">Jekyll</generator><link href="https://ishikura-a.github.io/feed.xml" rel="self" type="application/atom+xml" /><link href="https://ishikura-a.github.io/" rel="alternate" type="text/html" /><updated>2024-06-16T05:27:02+00:00</updated><id>https://ishikura-a.github.io/feed.xml</id><title type="html">Zihao Tang’s Homepage</title><subtitle>There should be something, but I just haven&apos;t figured it out :).</subtitle><entry><title type="html">Optimizing Language Models for Human Preferences is a Causal Inference Problem</title><link href="https://ishikura-a.github.io/paper_reading/2024/06/16/Optim-LLM-is-CI.html" rel="alternate" type="text/html" title="Optimizing Language Models for Human Preferences is a Causal Inference Problem" /><published>2024-06-16T03:00:00+00:00</published><updated>2024-06-16T03:00:00+00:00</updated><id>https://ishikura-a.github.io/paper_reading/2024/06/16/Optim-LLM-is-CI</id><content type="html" xml:base="https://ishikura-a.github.io/paper_reading/2024/06/16/Optim-LLM-is-CI.html"><![CDATA[<h2 id="backgrounds">Backgrounds</h2>
+
+<p>The demerits of DPO:</p>
+<ol>
+  <li>Need a reference model: resource consumption is <strong>doubled</strong>.</li>
+  <li>Preference dataset needs <strong>annotation</strong> by human or LLM.</li>
+  <li>The objective of DPO <strong>does not necessarily align with</strong> preference alignment.
+    <blockquote>
+      <p>The below term only constraint the objective <strong>in a probabilistic way</strong>.</p>
+
+      <p>$$
+P^*_{BT}(y_1\succ y_2|x)=\frac{\exp(r^*(x,y_1))}{\exp(r^*(x,y_1))+\exp(r^*(x,y_2))}.
+$$</p>
+    </blockquote>
+  </li>
+</ol>
+
+<p><strong>Recall</strong>: Why preference optimization is needed?</p>
+<ul>
+  <li>Learning an optimal language model can be difficult due to <strong>the presence of unmeasured confounding in the training data</strong>: external factors that affect both readers’ choice of texts to read and how they tend to respond to those texts.</li>
+</ul>
+
+<p>The solution to this optimization problem finds <strong>how to intervene on the text distribution of the generating model to best cause an optimal outcome</strong>.
+Could we use the abundant <strong>Direct Outcome Dataset</strong>?</p>
+
+<h2 id="utilize-direct-outcome-dataset">Utilize Direct Outcome Dataset</h2>
+
+<p>General Objective on direct outcome dataset: optimize the average outcome among individuals who observed the text $X$ and can be learned from $D_O$.</p>
+
+<p>$$
+\arg\max_{f}\mathbb{E}_{X\sim P^f}[\mathbb{E}_{D_O}[Y|X]].
+$$</p>
+
+<p>However, this objective does not necessarily align with the true optimization goal due to <strong>selection bias</strong>.
+We define $g(x)\equiv\mathbb{E}_{Y(\cdot)\sim \mathcal{G}}[Y(x)]$ as the average outcome if all individuals in the population were given text $x$.
+The goal is to maximize the value function:</p>
+
+<p>$$
+V(f)\equiv\mathbb{E}_{X\sim P^f}[g(X)].
+$$</p>
+
+<p>However, not all individuals in the population can be accessed. So we need to estimate this.
+we can link the value function to <strong>the randomization dataset $D^R$</strong>:</p>
+
+<p>$$
+V_{IPW}(f)=\mathbb{E}_{P^R}\big[\mathbb{E}_{P_y^R}[\frac{P^f(X)}{P^R(X)}\cdot Y]\big]
+$$</p>
+
+<p>Then, we can estimate it by $\hat{V_{IPW}}$.
+If $D^R$ is randomization dataset, we can show that $\hat{V_{IPW}}$ has no bias.</p>
+
+<p>$$
+\hat{V_{IPW}}(f)=\frac{1}{n}\sum_{i=1}^{n}\frac{P^f(X_i)}{P^R(X_i)}Y_i
+$$</p>
+
+<p>However, IPW has HIGH variance.
+Apart from Direct Outcome Datasets, we also have lots of unlabeled texts.
+So we can predict outcomes on unlabeled texts, i.e. <strong>IPW + Outcome Modeling = Doubly Robust Estimator</strong>:</p>
+
+<p>$$
+V_{DR}(f)=\mathbb{E}_{P^R}\big[\mathbb{E}_{P_y^R}[\frac{P^f(X)}{P^R(X)}\cdot Y - g(X)]\big] + \mathbb{E}_{X\sim P^f}[g(X)].
+$$</p>
+
+<p>Consider the outcome modeling term $\mathbb{E}_{X\sim P^f}[g(X)]$ first.
+It is difficult to optimize $g$ as $f$ is also updated.
+To remedy this, we can fix the language model:</p>
+
+<p>$$
+\mathbb{E}_{X\sim P^f}[g(X)]=\mathbb{E}_{X\sim P^{f^0}}\big[\frac{P^f(X)}{P^{f^0}(X)}g(X)\big].
+$$</p>
+
+<p>We can create a Monte Carlo estimate of this by drawing texts $\tilde{X_1},\cdots,\tilde{X_m}\sim P^{f^0}$ and computing:</p>
+
+<p>$$
+\hat{V_{out}}(f)=\frac{1}{m}\sum_{j=1}^m\frac{P^f(\tilde{X}_j)}{P^{f^0}(\tilde{X}_j)}\hat{g}(\tilde{X}_j),
+$$</p>
+
+<p>where $\hat{g}$ is a model trained to predict $Y$ from $X$.</p>
+
+<p>Finally, the doubly robust value function $V_{DR}$ can be estimated as the combination of the above 2 terms:</p>
+
+<p>$$
+\hat{V}_{DR}(f)=\frac{1}{n}\sum_{i=1}^n\frac{P^f(X_i)}{\hat{P^R}(X_i)}\cdot(Y_i - \hat{g}(X_i))+\frac{1}{m}\sum_{j=1}^m\frac{P^f(\tilde{X}_j)}{P^{f^0}(\tilde{X}_j)}\hat{g}(\tilde{X}_j).
+$$</p>
+
+<p>$\hat{V}_{DR}$ has no bias if either of the two terms hold:</p>
+<ol>
+  <li>$\hat{P^R}(X)=P^R(X)$</li>
+  <li>$\hat{g}(X)=g(X)$</li>
+</ol>]]></content><author><name></name></author><category term="paper_reading" /><summary type="html"><![CDATA[Backgrounds]]></summary></entry><entry><title type="html">SimPO: Simple Preference Optimization with a Reference-Free Reward</title><link href="https://ishikura-a.github.io/paper_reading/2024/06/02/SimPO.html" rel="alternate" type="text/html" title="SimPO: Simple Preference Optimization with a Reference-Free Reward" /><published>2024-06-02T04:00:00+00:00</published><updated>2024-06-02T04:00:00+00:00</updated><id>https://ishikura-a.github.io/paper_reading/2024/06/02/SimPO</id><content type="html" xml:base="https://ishikura-a.github.io/paper_reading/2024/06/02/SimPO.html"><![CDATA[<p>For background about DPO, readers are kindly referred to <a href="https://ishikura-a.github.io/paper_reading/2024/06/02/TDPO.html">TDPO</a>.</p>
+
+<p>Drawbacks of DPO:</p>
+<ol>
+  <li>need a reference model</li>
+  <li>the reward formulation is not directly aligned with the metric used to guide generation</li>
+</ol>
+
+<p>In response, this work propose SimPO, a simple yet effective offline preference optimization algorithm.
+The core of the algorithm aligns the reward function in the preference optimization objective
+with the generation metric. SimPO consists of two major components:</p>
+<ol>
+  <li><strong>a length-normalized reward</strong>, calculated as the average log probability of all tokens in a response using the policy model.</li>
+  <li><strong>a target reward margin</strong> to ensure the reward difference between winning and losing responses exceeds this margin.</li>
+</ol>
+
+<p>Adopting the reward function defined in DPO as the following drawbacks:</p>
+<ol>
+  <li>the requirement of a reference model $\pi_{\rm ref}$ during training incurs additional memory and computational costs.</li>
+  <li>there is a discrepancy between the reward being optimized during training and the generation metric used for inference</li>
+</ol>
+
+<p>During generation, the policy model $\pi_\theta$ is used to generate a sequence that approximately maximizes the average log likelihood, defined as follows:</p>
+
+<p>$$
+p_\theta(y|x)=\frac{1}{|y|}\log\pi_\theta(y|x)=\frac{1}{|y|}\sum_{i=1}^{|y|}\log\pi_\theta(y_i|x,y_{&lt;i}).
+$$</p>
+
+<p>While direct maximization of this metric during decoding is intractable, in DPO, for any triple $(x,y_w,y_l)$, satisfying the reward ranking $r(x,y_w) &gt; r(x,y_l)$ does not necessarily mean that the likelihood ranking $p_\theta(y_w|x) &gt; p_\theta(y_l|x)$ is met.
+It is natural to replace the reward function in DPO with $p_\theta$ since it aligns with the likelihood metric that guides generation, resulting in a length-normalized reward:</p>
+
+<p>$$
+r_{\rm SimPO}(x,y)=\beta\cdot p_\theta(y|x),
+$$
+where $\beta$ is a constant that controls the scaling of the reward difference.</p>
+
+<p>Additionally, they introduce a target reward margin term $\gamma&gt;0$, to the Bradley-Terry objective to ensure that the reward for the winning response $r(x,y_w)$, exceeds the reward for the losing response $r(x,y_l)$ by at least $\gamma$:</p>
+
+<p>$$
+p(y_w\succ y_l|x)=\sigma(r(x,y_w)-r(x,y_l)-\gamma).
+$$</p>
+
+<p>Hence, we can derive the objective function of SimPO by NLL loss:
+$$
+L_{\rm SimPO}(\pi_\theta)=-\mathbb{E}_{(x,y_w,y_l)\sim\mathcal{D}}[\log\sigma(p(y_w\succ y_l|x))].
+$$</p>
+
+<p>The comparison of objective functions between SimPO and other baselines is put in the table below:
+<img src="/assets/240602001.png" alt="comp" /></p>]]></content><author><name></name></author><category term="paper_reading" /><summary type="html"><![CDATA[For background about DPO, readers are kindly referred to TDPO.]]></summary></entry><entry><title type="html">Token-level Direct Preference Optimization</title><link href="https://ishikura-a.github.io/paper_reading/2024/06/02/TDPO.html" rel="alternate" type="text/html" title="Token-level Direct Preference Optimization" /><published>2024-06-02T04:00:00+00:00</published><updated>2024-06-02T04:00:00+00:00</updated><id>https://ishikura-a.github.io/paper_reading/2024/06/02/TDPO</id><content type="html" xml:base="https://ishikura-a.github.io/paper_reading/2024/06/02/TDPO.html"><![CDATA[<h2 id="iclm24"><strong><code class="language-plaintext highlighter-rouge">[ICLM'24]</code></strong></h2>
+
+<p>Finetuning pretrained LLMs is essential to align them with human values and intentions.
+The overall process is often done with pairwise comparisons and KL divergence against a reference LLM, focusing on the evaluation of full answers generated by the models.
+However, in contrast to the process of evaluation, the generation of answer occurs in a token level, following a sequential and auto-regressive fashion.</p>
+
+<p>To more align the evaluation with the generation, this work propose <strong>Token-level Direct Preference (TDPO)</strong> to align LLMs with human preferences by optimizing policy at the token level.
+TDPO incorporates forward KL divergence constraints for each token, improving alignment and diversity.
+Utilizing the Bradley-Terry model for a token-based reward system, TDPO enhances the regulation of KL divergence, while preserving simplicity without the need for explicit reward modeling.</p>
+
+<h2 id="preliminaries">Preliminaries</h2>
+
+<h3 id="rlhf">RLHF</h3>
+
+<p>The RLHF (Reinforcement Learning from Human Feedback) pipeline usually includes 3 phrases: supervised finetuning (SFT), preference sampling &amp; reward learning and RL optimization.</p>
+
+<p><strong>SFT</strong>: RLHF typically begins by fine-tuning a pre-trained LM with supervised learning on high-quality data for the downstream task(s) of interest (dialogue, summarization, etc.), to obtain a model $\pi^{SFT}$.</p>
+
+<p><strong>Reward Modeling Phase</strong>: In the second phase, the SFT model is prompted with prompt $x$ to produce pairs of answers $(y_1,y_2)\sim \pi^{SFT}(y|x)$.
+The pair is then presented to human labelers to decide the preferred ($y_w$) and dispreferred answers ($y_l$) in it, denoted as $y_w\succ y_l|x$.
+<strong>The preferences are assumed to be generated by some latent reward model $r^*(y,x)$, which we do not have access to.</strong>
+Generally, we have a number of approaches to model preference, among which the Bradley-Terry modeling is a popular choice.
+The BT model stipulates that the human preference distribution $p^*$ can be written as:</p>
+
+<p>$$
+P^*_{BT}(y_1\succ y_2|x)=\frac{\exp(r^*(x,y_1))}{\exp(r^*(x,y_1))+\exp(r^*(x,y_2))}.
+$$</p>
+
+<p>Assuming access to a static dataset of comparison $\mathcal{D}=\big\{x^i,y_w^i,y_l^i\big\}_{i=1}^N$ sampled from $p*$, we can parameterize a reward ward $r_\phi(x,y)$ and estimate the parameters via maximum likelihood.
+Framing the problem as a binary classification, we have the NLL loss:</p>
+
+<p>$$
+L_R(r_\phi,\mathcal{D})=-\mathbb{E}_{(x,y_w,y_l)\sim\mathcal{D}}[\log\sigma(r_\phi(x,y_w)-r_\phi(x,y_l))].
+$$</p>
+
+<p>In the context of LMs, <strong>the network $r_\phi$ is often initialized from the SFT model with the addition of a linear layer on the top of the final transformer layer, producing a single scalar prediction for the reward value.</strong>
+To ensure a reward function with lower variance, prior works normalized the rewards, such that $\mathbb{E}_{x,y\sim\mathcal{D}}[r_\phi(x,y)]=0$ for all $x$.</p>
+
+<h3 id="rl-finetuning-phase">RL Finetuning Phase:</h3>
+
+<p>During this phase, we use the learned reward function to provide feedback to the language model. In particular, the optimization problem is as follows:</p>
+
+<p>$$
+\max_{\pi_\theta}\mathbb{E}_{x\sim\mathcal{D},y\sim\pi_\theta(y|x)}\big[r_\phi(x,y)\big]-\beta\cdot KL(\pi_\theta\parallel \pi_{\rm ref}),
+$$</p>
+
+<p>where $\pi_{\rm ref}$ is namely the SFT model.
+In practice, the language model policy $\pi_\theta$ is also initialized to the SFT model.
+<strong>The added constraint is important, as it prevents the model from deviating too far from the distribution on which the reward model is accurate, as well as maintaining the generation diversity and preventing mode-collapse to single high-reward answers.</strong></p>
+
+<p>Due to the discrete nature of NLG, this objective is not differentiable and is typically optimized with RL, like constructing the reward function $r(x,y)=r_\phi(x,y)-\beta\cdot(\log\pi_\theta(y|x)-\log\pi_{\rm ref}(y|x))$ and maximizing with PPO.</p>
+
+<h2 id="direct-preference-optimization-dpo">Direct Preference Optimization (DPO)</h2>
+
+<p>The key insight of DPO is to leverage an analytical mapping from reward functions to optimal policies, which enables us to transform a loss function over reward functions into a loss function over policies.
+This change-of-variables approach <strong>avoids fitting an explicit, standalone reward model</strong>, while still <strong>optimizing under existing models of human preferences</strong>, such as the Bradley-Terry model.
+In essence, the policy network represents both the language model and the (implicit) reward.</p>
+
+<p>Following the RL objective above, we can show that the optimal solution to it takes the form:</p>
+
+<p>$$
+\pi_r(y|x)=\frac{1}{Z(x)}\cdot\pi_{\rm ref}(y|x)\cdot\exp(\frac{1}{\beta}\cdot r(x,y)),
+$$
+where $Z(x)=\sum_y \pi_{\rm ref}(y|x)\cdot\exp(\frac{1}{\beta}\cdot r(x,y))$ is the partition function.</p>
+
+<p>We could transform the equation to obtain the reward function $r$. Actually, DPO established a mapping between the reward model and the optimal policy under the <strong>reverse KL divergence</strong>:</p>
+
+<p>$$
+r(x,y)=\beta\cdot\log\frac{\pi_r(y|x)}{\pi_{\rm ref}(y|x)}+\beta\cdot\log Z(x).
+$$</p>
+
+<p>By substituting the reward into the Bradley-Terry equation, we can express the human preference probability in terms of only <strong>the optimal policy $\pi^*$ and reference policy $\pi_{\rm ref}$</strong>:</p>
+
+<p>$$
+p^*(y_1\succ y_2|x)=\sigma(r^*(x,y_1)-r^*(x,y_2))=\frac{1}{1+\exp(\beta\cdot\log\frac{\pi^*(y_2|x)}{\pi_{\rm ref}(y_2|x)}-\beta\cdot\log\frac{\pi^*(y_1|x)}{\pi_{\rm ref}(y_1|x)})}
+$$</p>
+
+<p>Hence, we can obtain the objective by NLL loss on this:</p>
+
+<p>$$
+u(x,y_w,y_l)=\beta\cdot\log\frac{\pi_\theta(y_w|x)}{\pi_{\rm ref}(y_w|x)}-\beta\cdot\log\frac{\pi_\theta(y_l|x)}{\pi_{\rm ref}(y_l|x)},
+$$</p>
+
+<p>$$
+L_{DPO}=-\mathbb{E}_{(x,y_w,y_l)\sim\mathcal{D}}[\log\sigma(u(x,y_w,y_l))]
+$$</p>
+
+<p>where $\mathcal{D}$ represents the human preference dataset, $\pi_{\rm ref}(\cdot|x)$ serves as a reference model (typically chosen the LM after SFT), $\pi_\theta(\cdot|x)$ represents the model undergoing RL finetuning, initialized with $\pi_\theta=\pi_{\rm ref}$.</p>
+
+<p>This objective could also be represented by the <strong>reverse KL divergence</strong>:</p>
+
+<p>$$
+\max_{\pi_\theta}\mathbb{E}_{x\sim\mathcal{D},y\sim\pi_\theta(\cdot|x)}\big[r(x,y)-\beta\cdot \rm{KL}(\pi_\theta(\cdot|x)\parallel\pi_{\rm ref}(\cdot|x))\big],
+$$</p>
+
+<h2 id="methodology">Methodology</h2>
+<p>Let’s denote the response consists of $T$ tokens $y$ as $y^{&lt;T+1}:=[y_1,\cdots,y_T]$.
+When modeling text generation as a Markov decision process a state is a combination of the prompt and the generated response up to the current step, denoted as $s_t:=[x,y^{&lt;t}]$.
+An action corresponds to the next generated token, denoted as $a_t:=y^t$.
+The token-wise reward is defined as $R_t:=R(s_t,a_t)$.</p>
+
+<p>Expanding on the provided definitions, we establish the state-action function $Q_\pi$, the state value function $V_\pi$ and the advantage function $A_\pi$ for a policy $\pi$:</p>
+
+<p>$$
+Q_\pi(s_t,a_t)=\mathbb{E}_\pi\big[\sum_{k=0}^{\infty}{\gamma^kR_{t+k}|s_t,a_t}\big],
+$$</p>
+
+<p>$$
+V_\pi(s_t)=\mathbb{E}_\pi\big[Q_\pi(s_t,a_t)|s_t\big],
+$$</p>
+
+<p>$$
+A_\pi(s_t,a_t)=Q_\pi(s_t,a_t)-V_\pi(s_t).
+$$</p>
+
+<p>In contrast to DPO’s sentence-level objective, this work proposes a token-level objective:</p>
+
+<p>$$
+\max_{\pi_\theta}\mathbb{E}\big[A_{\pi_{\rm ref}}(s_t,z)-\beta\cdot{KL}(\pi_\theta(\cdot|s_t)\parallel\pi_{\rm ref}(\cdot|s_t))\big].
+$$</p>
+
+<p>This constrained problem has closed-form solution:</p>
+
+<p>$$
+\pi^*_\theta(z|s_t)=\frac{\pi_{\rm ref}(z|s_t)\cdot\exp(\frac{1}{\beta}\cdot Q_{\pi_{\rm ref}}(s_t,z))}{Z(s_t;\beta)},
+$$</p>
+
+<p>$$
+Z(s_t;\beta)=\mathbb{E}_{z\sim\pi_{\rm ref}(\cdot|s_t)}[\exp(\frac{1}{\beta}\cdot Q_{\pi_{\rm ref}}(s_t,z))],
+$$</p>
+
+<p>where $Z$ is the partition function.</p>
+
+<p>To facilitate subsequent derivations, this work first introduce the sequential KL divergence:</p>
+
+<p>$$
+{\rm SeqKL}(x,y;\pi_1\parallel\pi_2)=\sum_{t=1}^T KL(\pi_1(\cdot;s_t)\parallel\pi_2(\cdot;s_t)).
+$$</p>
+
+<p>In the KL-constrained advantage function maximization problem, he Bradley-Terry model express the human preference probability in terms of the optimal policy $\pi^*_\theta$ and reference policy $\pi_{\rm ref}$:</p>
+
+<p>$$
+P^*_{BT}(y_1\succ y_2|x)=\sigma(u^*(x,y_1,y_2)-\delta^*(x,y_1,y_2)),
+$$
+where $u$ is the difference in rewards implicitly declared above, and $\delta$ is the difference in sequential forward KL divergence:</p>
+
+<p>$$
+\delta(x,y_1,y_2)=\beta\cdot{\rm SeqKL}(x,y_2;\pi_{\rm ref}\parallel\pi_\theta)-\beta\cdot{\rm SeqKL}(x,y_1;\pi_{\rm ref}\parallel\pi_\theta).
+$$</p>
+
+<p>Consequently, the initial version of TDPO can be represented as:
+$$
+L_{TDPO_1}(\pi_\theta;\pi_{\rm ref})=-\mathbb{E}_{(x,y_w,y_l)\sim\mathcal{D}}[\log\sigma(u(x,y_w,y_l)-\delta(x,y_w,y_l))].
+$$</p>
+
+<p>For improved performance, we could stop the gradient of the loss to obtain the second version of TDPO. We put the summarization of the loss function below:
+<img src="/assets/240602000.png" alt="fig/loss" /></p>]]></content><author><name></name></author><category term="paper_reading" /><summary type="html"><![CDATA[[ICLM'24]]]></summary></entry><entry><title type="html">KL Divergence: Forward vs Reverse?</title><link href="https://ishikura-a.github.io/technical_tips/2024/05/30/forward-KL-versus-reverse-KL.html" rel="alternate" type="text/html" title="KL Divergence: Forward vs Reverse?" /><published>2024-05-30T04:00:00+00:00</published><updated>2024-05-30T04:00:00+00:00</updated><id>https://ishikura-a.github.io/technical_tips/2024/05/30/forward-KL-versus-reverse-KL</id><content type="html" xml:base="https://ishikura-a.github.io/technical_tips/2024/05/30/forward-KL-versus-reverse-KL.html"><![CDATA[<p><strong>Kullback-Leibler Divergence</strong>, or KL Divergence is a measure on how “off” two probability distributions $P(X)$ and $Q(X)$ are. It measures the distance between two probability distributions.</p>
+
+<p>Generally, KL divergence could be computed as follows:
+$$
+    KL(P(X)\parallel Q(X))=\sum_{x\in X}P(x)\cdot\log\frac{P(x)}{Q(x)}.
+$$
+That is, for all random variable $x\in X$, KL divergence computes the weighted on the difference between those distributions at $x$.</p>
+
+<p>It is easy to observe that KL is <strong>NOT</strong> a symmetric metric to $P(X)$ and $Q(X)$, that is, in most cases $KL(P(X)\parallel Q(X)) \neq KL(Q(X)\parallel P(X))$.</p>
+
+<blockquote>
+  <p>BTW, the symmetric version of KL is called Jenson-Shanon Divergence, formatted as
+$$
+  JSD(P\parallel Q)=\frac{1}{2}\cdot KL(P\parallel M) + \frac{1}{2}\cdot KL(Q\parallel M),
+$$
+where $M=\frac{1}{2}\cdot(P+Q)$, is a mixture distribution of $P$ and $Q$.</p>
+</blockquote>
+
+<p>So, here comes the question, if we assume $P$ as the true distribution we want to approximate and $Q$ is the approximate distribution, <strong>should we optimize towards $KL(P\parallel Q)$ or $KL(Q\parallel P)$</strong>?</p>
+
+<p>Generally, in such cases, we denote $KL(P\parallel Q)$ and $KL(Q\parallel P)$ as reverse-KL separately.</p>
+
+<h2 id="forward-kl">Forward-KL</h2>
+<p>In forward-KL, $P$ acts as the weight factor. Consider $P(x)=0$ for a specific $x$, then the term $P(x)\cdot\log\frac{P(x)}{Q(x)}$ would always be zero. Simply put, when $P(x)=0$, it doesn’t matter that how different $P$ and $Q$ is at this point. As a result, we would ignore the affect of $Q(x)$ here.</p>
+
+<p>Hence, during the optimization, the different between $P(x)$ and $Q(x)$ will be minimized <strong>only when $P(x) &gt; 0$</strong>.</p>
+
+<p>Let’s see some visual examples.</p>
+
+<p><img src="/assets/240530000.png" alt="example/01_greater_KL" /></p>
+
+<p>In the above example, the right hand side mode is not covered by $Q$, but $P(x) &gt; 0$. Therefore, the KL divergence would be big.</p>
+
+<p><img src="/assets/240530001.png" alt="example/02_smaller_KL" /></p>
+
+<p>In this example, $Q$ covers more areas compared to the previous one. As a result, the KL divergence would be smaller.</p>
+
+<p>Intuitively, forward-KL is also called <strong>zero-avoiding</strong>, as it avoids $Q(x)=0$ whenever $P(x)&gt;0$.</p>
+
+<h2 id="reverse-kl">Reverse-KL</h2>
+
+<p>As we switch the positions of the two distribution in the formula, we get reverse-KL, with $Q$ as the weight AND the approximate distribution.</p>
+
+<p>When $Q(x) = 0$, again we ignore the value of $P(x)$ at these points. When $Q(x)&gt;0$, we should minimize their distances here to achieve a lower KL divergence. In such cases, the first example, which has a larger forward-KL divergence, would be the desirable outcome under the evaluation of reverse-KL. That is, for Reverse KL, it is better to fit just some portion of $P$, as long as that approximate is good.</p>
+
+<p>As those properties suggest, this form of KL Divergence is known as <strong>zero forcing</strong>, as it forces $Q$ to be 0 on some areas, even if $P(x) &gt; 0$.</p>
+
+<h2 id="conclusion">Conclusion</h2>
+
+<p>Back to the question, the answer would be “it always depends”. We should choose the proper KL suitable to our problems.</p>
+
+<p>Especially, in Bayesian Inference, in VAE (Variational Auto Encoder), Reverse KL is widely used.</p>
+
+<h2 id="reference">Reference</h2>
+
+<ol>
+  <li><a href="https://agustinus.kristia.de/techblog/2016/12/21/forward-reverse-kl/">https://agustinus.kristia.de/techblog/2016/12/21/forward-reverse-kl/</a></li>
+</ol>]]></content><author><name></name></author><category term="technical_tips" /><summary type="html"><![CDATA[Kullback-Leibler Divergence, or KL Divergence is a measure on how “off” two probability distributions $P(X)$ and $Q(X)$ are. It measures the distance between two probability distributions.]]></summary></entry></feed>
